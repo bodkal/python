@@ -1,0 +1,8 @@
+
+
+<launch>
+    <include file="$(find manipulator_h_gazebo)/launch/manipulator_h_gazebo.launch">
+        <param name="box_description" command="/home/koby/ws_moveit/src/manipolator/ROBOTIS-MANIPULATOR-H/400X400X200box/urdf/400X400X200box.urdf"/>
+        <node name="box_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" args="robot_description:=box_description" />
+    </include>
+</launch>
