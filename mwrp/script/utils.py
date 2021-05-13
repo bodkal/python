@@ -1,7 +1,7 @@
 import numpy as np
 from random import randint
 from time import time
-from scipy.spatial.distance import cdist
+import matplotlib.pyplot as plt
 
 
 class Utils:
@@ -106,13 +106,75 @@ class Utils:
         centrality_list = sorted(centrality_list)
         return centrality_list
 
+    @staticmethod
+    def print_pivot(world,pivot):
+        tmp = np.copy(world.grid_map)
+        for cell in pivot.keys():
+            tmp[cell] = 3
+        plt.figure(1)
+        plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
+        plt.gca().set_aspect('equal')
+        plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+        plt.show()
+
+    @staticmethod
+    def print_whacer(world, tmp_cell):
+        for pivot_cell in tmp_cell:
+            tmp = np.copy(world.grid_map)
+            for cell in world.dict_wachers[pivot_cell]:
+                tmp[cell] = 3
+            tmp[pivot_cell] = 2
+
+            plt.figure(pivot_cell.__str__())
+            plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
+            plt.gca().set_aspect('equal')
+            plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+
+        plt.show()
+
+    @staticmethod
+    def print_all_whacers(world, tmp_cell):
+        tmp = np.copy(world.grid_map)
+
+        for pivot_cell in tmp_cell:
+            for cell_2 in pivot_cell:
+                for cell in world.dict_wachers[cell_2]:
+                    if not tmp[cell]==2:
+                        tmp[cell] = 3
+                tmp[cell_2] = 2
+
+
+            plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
+            plt.gca().set_aspect('equal')
+            plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+
+        plt.show()
+
+    @staticmethod
+    def print_fov(grid_map,all_cell,main_cell):
+        tmp = np.copy(grid_map)
+
+        for cell in all_cell:
+            if not tmp[cell]==2:
+                tmp[cell] = 3
+            tmp[main_cell] = 2
+
+        plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
+        plt.gca().set_aspect('equal')
+        plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+        plt.show()
+
+
+    @staticmethod
+    def map_to_sets(cell):
+        return set(map(tuple,[cell]))
 
 class Node:
 
-    def __init__(self, parent, location, need_to_see, cost=0, heuristics=0):
+    def __init__(self, parent, location, unseen, cost=0, heuristics=0):
         self.parent = parent
         self.location = location
-        self.need_to_see = need_to_see
+        self.unseen = unseen
         self.cost = cost
         self.heuristics = heuristics
 
@@ -141,13 +203,15 @@ class Bresenhams:
             self.end = True
             return False
 
-        e2 = 2 * self.err
+        e2 = 1 * self.err
         if e2 > -self.dy:
             self.err = self.err - self.dy
             self.x0 = self.x0 + self.sx
+
         if e2 < self.dx:
             self.err = self.err + self.dx
             self.y0 = self.y0 + self.sy
+
         return tuple((self.x0, self.y0))
 
     def get_line(self, start_cell, end_cell):
@@ -210,11 +274,13 @@ class FloydWarshall:
                 if key not in self.dict_dist:
                     self.dict_dist[key] = cost_map[ii][jj]
 
+        centrality_dict = {tuple(self.free_cell[index]) : sum(row) for index, row in enumerate(cost_map)}
+        return self.dict_dist, centrality_dict
 
-        #dist_map = {i: tuple(d) for i, d in enumerate(self.free_cell)}
-        #cost_map2 = {tuple(self.free_cell[index]) : sum([i**2 for i in row]) for index, row in enumerate(cost_map)}
-        cost_map = {tuple(self.free_cell[index]) : sum(row) for index, row in enumerate(cost_map)}
 
-       # return self.dict_dist, cost_map1, dist_map,cost_map2
-        return self.dict_dist, cost_map
+
+
+
+
+
 

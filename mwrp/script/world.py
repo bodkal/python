@@ -2,7 +2,7 @@ import numpy as np
 from itertools import product
 from time import time
 import sys
-from script.utils import Bresenhams
+from script.utils import Bresenhams ,Utils
 
 class WorldMap:
 
@@ -170,23 +170,38 @@ class WorldMap:
         return self.get_fov()
 
 
+
+
     # def create_wachers(self):
     #     all_free_cell=set(map(tuple,np.asarray(np.where(self.grid_map == 0)).T))
     #     for cell in all_free_cell:
-    #         self.dict_wachers[cell] = self.get_seen_from_cell(cell)
+    #         self.dict_wachers[cell] = self.get_fov(cell)
+
+
+
 
     def create_wachers(self):
-        all_free_cell=set(map(tuple,np.asarray(np.where(self.grid_map == 0)).T))
+        all_free_cell = set(map(tuple, np.asarray(np.where(self.grid_map == 0)).T))
         for cell in all_free_cell:
-            self.dict_wachers[cell] = self.get_fov(cell)
+            tmp_set = self.get_fov(cell)
+            #if cell == (7,13):
+            #Utils.print_fov(self.grid_map,tmp_set,cell)
+
+            for wahers in tmp_set:
+
+                if wahers != cell:
+                    if wahers in self.dict_wachers:
+                        self.dict_wachers[wahers] = self.dict_wachers[wahers].union(Utils.map_to_sets(cell))
+                    else:
+                        self.dict_wachers[wahers] = Utils.map_to_sets(cell)
 
 
     def get_all_seen(self,state):
         tmp_set_seen=set()
         for cell in state:
-            tmp_set_seen= tmp_set_seen | self.dict_wachers[cell]
-
+            tmp_set_seen = tmp_set_seen.union(self.dict_wachers[cell])
         return tmp_set_seen
+
 
     def is_valid_node(self, new_state, old_state):
         if not self.in_bund(new_state):
@@ -197,32 +212,34 @@ class WorldMap:
             return False
         return True
 
+
+
     def get_fov(self,start_cell):
         all_seen = set()
 
         for y in range(self.grid_map.shape[1]):
             end_cell=(0,y)
             tmp_seen = self.breas.get_line(start_cell, end_cell)
-            all_seen=set.union(all_seen , tmp_seen)
-
-        for x in range(1,self.grid_map.shape[0]):
-            end_cell = (x,self.grid_map.shape[1]-1)
-            tmp_seen = self.breas.get_line(start_cell, end_cell)
-            all_seen = set.union(all_seen, tmp_seen)
-
-        for y in range(self.grid_map.shape[1]):
-            end_cell=(self.grid_map.shape[0]-1,y)
-            tmp_seen= self.breas.get_line(start_cell, end_cell)
-            all_seen=set.union(all_seen , tmp_seen)
+            all_seen = all_seen | tmp_seen
 
         for x in range(1,self.grid_map.shape[0]):
             end_cell = (x,0)
             tmp_seen = self.breas.get_line(start_cell, end_cell)
-            all_seen = set.union(all_seen, tmp_seen)
+            all_seen = all_seen | tmp_seen
+
+        for x in range(1,self.grid_map.shape[0]):
+            end_cell = (x,self.grid_map.shape[1]-1)
+            tmp_seen = self.breas.get_line(start_cell, end_cell)
+            all_seen = all_seen | tmp_seen
+
+        for y in range(self.grid_map.shape[1]):
+            end_cell=(self.grid_map.shape[0]-1,y)
+            tmp_seen= self.breas.get_line(start_cell, end_cell)
+            all_seen= all_seen | tmp_seen
+
+
 
         return all_seen
-
-
 
 
 
