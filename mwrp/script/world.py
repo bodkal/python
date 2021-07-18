@@ -14,8 +14,10 @@ class WorldMap:
         [self.col_max,self.row_max] = self.grid_map.shape
         self.free_cell=len((np.where(self.grid_map==0)[0]))
 
-        self.LOS=los
+        #self.LOS=los
         self.dict_wachers=dict()
+        self.dict_fov=dict()
+
         self.create_wachers()
 
 
@@ -26,19 +28,22 @@ class WorldMap:
         elif(los==5):
             self.action = self.get_static_action_5(1)
         elif(los==4):
-            self.action = self.get_static_action_4(1)
+            self.action = np.vstack((self.get_static_action_4(1),[0,0]))
 
 
     def get_action(self, state, move_index):
 
         action=[]
-
+        moving_status=[]
         for index,data in enumerate(state):
+                action.append((self.action[move_index[index]][0]+ data[0],self.action[move_index[index]][1]+ data[1]))
+                moving_status.append(np.sum(np.abs(self.action[move_index[index]])))
+        return tuple(action) , moving_status
 
-            action.append((self.action[move_index[index]][0]+ data[0],self.action[move_index[index]][1]+ data[1]))
-
-        return tuple(action)
-
+    def is_disjoit(self,cell_a,cell_b):
+        if self.dict_wachers[cell_a].intersection(self.dict_wachers[cell_b]):
+            return False
+        return True
 
     def in_bund(self, state):
         for cell in state:
@@ -79,95 +84,95 @@ class WorldMap:
             all_index = np.intersect1d(tmp_index, all_index)
         return np.copy(all_opsens[all_index]).astype(int)
 
-    def los_4(self, state):
+    # def los_4(self, state):
+    #
+    #     los4=np.zeros((1,2)).astype(int)
+    #     for i in range(state[1]+1,self.row_max):
+    #         if self.grid_map[state[0],i] == 1:
+    #             break
+    #         los4=np.vstack((los4,[state[0],i]))
+    #
+    #     for i in np.flip(range(state[1])):
+    #         if self.grid_map[state[0],i] == 1:
+    #             break
+    #         los4=np.vstack((los4,[state[0],i]))
+    #
+    #     for i in range(state[0],self.col_max):
+    #         if self.grid_map[i,state[1]] == 1:
+    #             break
+    #         los4=np.vstack((los4,[i,state[1]]))
+    #
+    #     for i in np.flip(range(state[0])):
+    #         if self.grid_map[i,state[1]] == 1:
+    #             break
+    #         los4=np.vstack((los4,[i,state[1]]))
+    #
+    #     return los4[1:]
+    #
+    # def los_4_test(self, state,tmp_map):
+    #
+    #     for i in range(state[1] + 1, self.row_max):
+    #         if self.grid_map[state[0], i] == 1:
+    #             break
+    #         tmp_map[state[0], i]=2
+    #
+    #     for i in np.flip(range(state[1])):
+    #         if self.grid_map[state[0], i] == 1:
+    #             break
+    #         tmp_map[state[0], i] = 2
+    #
+    #     for i in range(state[0], self.col_max):
+    #         if self.grid_map[i, state[1]] == 1:
+    #             break
+    #         tmp_map[i, state[1]]=2
+    #
+    #     for i in np.flip(range(state[0])):
+    #         if self.grid_map[i, state[1]] == 1:
+    #             break
+    #         tmp_map[i, state[1]]=2
+    #
+    #     return tmp_map
+    #
+    #
+    # def los_8(self, state):
+    #     los8=self.los_4(state)
+    #     for i in range(1,self.row_max):
+    #         if self.grid_map[state[0]+i,state[1]+ i] == 1:
+    #             break
+    #         los8=np.vstack((los8,[state[0]+i,state[1]+ i]))
+    #
+    #     for i in range(1,min(state[0],state[1])):
+    #         if self.grid_map[state[0]-i,state[1]- i] == 1:
+    #             break
+    #         los8=np.vstack((los8,[state[0]-i,state[1]- i]))
+    #
+    #     for i in range(1,self.col_max):
+    #         if self.grid_map[state[0]-i,state[1]+ i] == 1:
+    #             break
+    #         los8=np.vstack((los8,[state[0]-i,state[1]+ i]))
+    #
+    #     for i in range(1,max(state[0],state[1])):
+    #         if self.grid_map[state[0]+i,state[1] - i] == 1:
+    #             break
+    #         los8=np.vstack((los8,[state[0]+i,state[1]- i]))
+    #
+    #     return los8
+    #
+    #
+    # def get_seen_from_cell(self,state):
+    #     seen=0
+    #     if (self.LOS == 9):
+    #         seen=self.los_9(state)
+    #     elif (self.LOS  == 8):
+    #         seen=self.los_8(state)
+    #     elif (self.LOS  == 5):
+    #         seen=self.los_5(state)
+    #     elif (self.LOS  == 4):
+    #         seen=self.los_4(state)
+    #     return set(map(tuple,seen))
 
-        los4=np.zeros((1,2)).astype(int)
-        for i in range(state[1]+1,self.row_max):
-            if self.grid_map[state[0],i] == 1:
-                break
-            los4=np.vstack((los4,[state[0],i]))
-
-        for i in np.flip(range(state[1])):
-            if self.grid_map[state[0],i] == 1:
-                break
-            los4=np.vstack((los4,[state[0],i]))
-
-        for i in range(state[0],self.col_max):
-            if self.grid_map[i,state[1]] == 1:
-                break
-            los4=np.vstack((los4,[i,state[1]]))
-
-        for i in np.flip(range(state[0])):
-            if self.grid_map[i,state[1]] == 1:
-                break
-            los4=np.vstack((los4,[i,state[1]]))
-
-        return los4[1:]
-
-    def los_4_test(self, state,tmp_map):
-
-        for i in range(state[1] + 1, self.row_max):
-            if self.grid_map[state[0], i] == 1:
-                break
-            tmp_map[state[0], i]=2
-
-        for i in np.flip(range(state[1])):
-            if self.grid_map[state[0], i] == 1:
-                break
-            tmp_map[state[0], i] = 2
-
-        for i in range(state[0], self.col_max):
-            if self.grid_map[i, state[1]] == 1:
-                break
-            tmp_map[i, state[1]]=2
-
-        for i in np.flip(range(state[0])):
-            if self.grid_map[i, state[1]] == 1:
-                break
-            tmp_map[i, state[1]]=2
-
-        return tmp_map
-
-
-    def los_8(self, state):
-        los8=self.los_4(state)
-        for i in range(1,self.row_max):
-            if self.grid_map[state[0]+i,state[1]+ i] == 1:
-                break
-            los8=np.vstack((los8,[state[0]+i,state[1]+ i]))
-
-        for i in range(1,min(state[0],state[1])):
-            if self.grid_map[state[0]-i,state[1]- i] == 1:
-                break
-            los8=np.vstack((los8,[state[0]-i,state[1]- i]))
-
-        for i in range(1,self.col_max):
-            if self.grid_map[state[0]-i,state[1]+ i] == 1:
-                break
-            los8=np.vstack((los8,[state[0]-i,state[1]+ i]))
-
-        for i in range(1,max(state[0],state[1])):
-            if self.grid_map[state[0]+i,state[1] - i] == 1:
-                break
-            los8=np.vstack((los8,[state[0]+i,state[1]- i]))
-
-        return los8
-
-
-    def get_seen_from_cell(self,state):
-        seen=0
-        if (self.LOS == 9):
-            seen=self.los_9(state)
-        elif (self.LOS  == 8):
-            seen=self.los_8(state)
-        elif (self.LOS  == 5):
-            seen=self.los_5(state)
-        elif (self.LOS  == 4):
-            seen=self.los_4(state)
-        return set(map(tuple,seen))
-
-    def get_seen_from_cell_breas(self,state):
-        return self.get_fov()
+    # def get_seen_from_cell_breas(self,state):
+    #     return self.get_fov()
 
 
 
@@ -186,30 +191,40 @@ class WorldMap:
             tmp_set = self.get_fov(cell)
             #if cell == (7,13):
             #Utils.print_fov(self.grid_map,tmp_set,cell)
-
+            self.dict_fov[cell]=tmp_set
             for wahers in tmp_set:
-
                 if wahers != cell:
                     if wahers in self.dict_wachers:
                         self.dict_wachers[wahers] = self.dict_wachers[wahers].union(Utils.map_to_sets(cell))
                     else:
                         self.dict_wachers[wahers] = Utils.map_to_sets(cell)
+        # Utils.print_fov(self.grid_map,self.get_fov((6,6)), (6,6))
+
 
 
     def get_all_seen(self,state):
         tmp_set_seen=set()
         for cell in state:
-            tmp_set_seen = tmp_set_seen.union(self.dict_wachers[cell])
+            tmp_set_seen = tmp_set_seen.union(self.dict_fov[cell])
+            #tmp_set_seen = tmp_set_seen.union(self.get_fov(cell))
+
         return tmp_set_seen
 
 
-    def is_valid_node(self, new_state, old_state):
+    def is_valid_node(self, new_state, old_state,moving_status):
+
         if not self.in_bund(new_state):
             return False
         elif not self.is_obstical(new_state):
             return False
         elif new_state == old_state.parent.location:
             return False
+        elif not np.any(moving_status):
+            return False
+
+        for i in old_state.dead_agent:
+            if moving_status[i]!=0:
+                return False
         return True
 
 

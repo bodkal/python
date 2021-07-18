@@ -2,6 +2,7 @@ import numpy as np
 from random import randint
 from time import time
 import matplotlib.pyplot as plt
+import csv
 
 
 class Utils:
@@ -111,11 +112,11 @@ class Utils:
         tmp = np.copy(world.grid_map)
         for cell in pivot.keys():
             tmp[cell] = 3
-        plt.figure(1)
+        #plt.figure(1)
         plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
         plt.gca().set_aspect('equal')
         plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
-        plt.show()
+       # plt.show()
 
     @staticmethod
     def print_whacer(world, tmp_cell):
@@ -125,7 +126,7 @@ class Utils:
                 tmp[cell] = 3
             tmp[pivot_cell] = 2
 
-            plt.figure(pivot_cell.__str__())
+           # plt.figure(pivot_cell.__str__())
             plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
             plt.gca().set_aspect('equal')
             plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
@@ -147,8 +148,10 @@ class Utils:
             plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
             plt.gca().set_aspect('equal')
             plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
-
-        plt.show()
+        plt.draw()
+        plt.pause(0.001)
+        plt.clf()
+        #plt.show()
 
     @staticmethod
     def print_fov(grid_map,all_cell,main_cell):
@@ -169,15 +172,28 @@ class Utils:
     def map_to_sets(cell):
         return set(map(tuple,[cell]))
 
+    @staticmethod
+    def convert_map(map_config):
+        #row_map = []
+
+        with open(map_config, newline='') as txtfile:
+            #all_row = []
+            row_map=[ [0 if cell == '.' else 1 for cell in row[:-1]] for row in txtfile.readlines()]
+
+        return row_map
+
 class Node:
 
-    def __init__(self, parent, location, unseen, cost=0, heuristics=0):
+    def __init__(self, parent, location, unseen,dead_agent,cost=0, heuristics=0):
         self.parent = parent
         self.location = location
         self.unseen = unseen
         self.cost = cost
         self.heuristics = heuristics
+        self.dead_agent=dead_agent
 
+    def __sort__(self):
+        return tuple(sorted((self.location)))
 
 class Bresenhams:
     def __init__(self, grid_map):
@@ -278,9 +294,140 @@ class FloydWarshall:
         return self.dict_dist, centrality_dict
 
 
+from docplex.mp.model import Model
+import docplex.mp.solution as mp_sol
+
+class lp_mtsp():
+
+    def __init__(self,agent_number,pivot,distance_dict):
+        self.mdl = Model('SD-MTSP')
+        self.m = agent_number
+        self.mdl.set_time_limit(50)
+        self.mdl.parameters.threads = 1
+        self.mdl.parameters.mip.cuts.flowcovers = 1
+        self.mdl.parameters.mip.cuts.mircut = 1
+        self.mdl.parameters.mip.strategy.probe = 1
+        self.mdl.parameters.mip.strategy.variableselect = 4
+        self.mdl.parameters.mip.limits.cutpasses=-1
+
+        #self.mdl.parameters.mip.strategy.presolvenode = 2
+        #self.mdl.parameters.mip.strategy.heuristicfreq: 100
+        #self.mdl.parameters.mip.strategy.backtrack: 0.1
 
 
+        # self.distance_out = {(0, i): 0 for i in range(1,self.m+1)}
+       # self.distance_in_agent = {(i, 0): 0 for i in range(1,self.m+1)}
+
+        self.k = self.mdl.continuous_var_dict(1, lb=0, name='k')
+
+        # self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
+        # self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
+
+        self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
+        self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
+
+        self.x = self.mdl.binary_var_dict(list(distance_dict.keys()), name='x')
+
+        self.mdl.minimize(self.k[0])
+
+        #print(self.mdl.export_to_string())
 
 
+    def add_var(self,pivot,distance_dict):
+
+        for i in set(pivot.keys())-set(self.u_pivot.keys()):
+                self.u_pivot={**self.mdl.continuous_var_dict([i], lb=0, name='u_pivot'),**self.u_pivot}
+
+        for i in set(distance_dict.keys())-set(self.x.keys()):
+                self.x={**self.mdl.binary_var_dict([i], lb=0, name='x'),**self.x}
+
+    def get_makespan(self, for_plot, w, pivot, n, citys,distance_dict):
+        t=time()
+        self.mdl.clear_constraints()
+
+        self.add_var(pivot, distance_dict)
+        # print(len(distance_dict))
+        # distance_dict = {**self.distance_in_agent,**self.distance_out, **distance_dict}
+        # print(len(distance_dict))
+
+        all_directed_edges = list(distance_dict.keys())
+
+        all_u={**self.u_start_and_agent, **{key : self.u_pivot[key] for key in pivot.keys()}}
+
+        #max_subtoor
+        self.mdl.add_constraints_([self.k[0]>=self.u_pivot[c] for c in pivot.keys()])
+
+        # 'out'
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if i == c) == 1
+                                                                                for c in list(all_u.keys())[1:]])
+        # in
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if j == c) == 1
+                                                                                for c in list(all_u.keys())[1:]])
+
+        self.mdl.add_constraint_(self.mdl.sum(self.x[(j, 0)] for j in all_u if j != 0) == self.m)
+
+        a, b = zip(*[(self.x[c], all_u[c[1]] == all_u[c[0]] + distance_dict[c])
+                     for c in distance_dict.keys() if c[0] != 0 and c[1] != 0])
+
+        self.mdl.add_indicators(a,b,[1]*a.__len__())
+        #print(f'genarate cplax - {time() -t}')
+        #t=time()
+
+        solucion = self.mdl.solve(log_output=False)
+        #print(f'solve - {time() -t}')
+
+        # cpx = self.mdl.get_engine().get_cplex()
+        # status = cpx.parameters.tune_problem()
+        # if status == cpx.parameters.tuning_status.completed:
+        #     print("tuned parameters:")
+        #     for param, value in cpx.parameters.get_changed():
+        #         print("{0}: {1}".format(repr(param), value))
+        # else:
+        #     print("tuning status was: {0}".format(cpx.parameters.tuning_status[status]))
 
 
+        if self.mdl.solve_status.name != 'OPTIMAL_SOLUTION':
+            print('-1')
+            return -1
+
+        max_u = solucion.get_objective_value()
+
+
+        return round(max_u)
+
+    def print_SD_MTSP_on_map(self,for_plot,all_cell_location,best_x,w,p):
+
+        import matplotlib.pyplot as plt
+        plt.figure('0')
+        arcos_activos = [e for e in all_cell_location if best_x[e].solution_value > 0.9]
+        for i, j in arcos_activos:
+            plt.plot([for_plot[i][1]+0.5, for_plot[j][1]+0.5], [for_plot[i][0]+0.5, for_plot[j][0]+0.5], color='r', alpha=0.6,linewidth=2, marker='o')
+        # for i, j in for_plot:
+        #     plt.scatter(j, i, color='r', zorder=1)
+        for i in self.citys:
+            plt.annotate(i, xy=(for_plot[i][1]+0.5, for_plot[i][0]+0.5),color ='k',weight='bold')
+        Utils.print_pivot(w,p)
+        plt.show()
+
+    def get_subtoor(self,x,all_cell_location,distance_dict):
+        ac0 = []
+        ac1 = []
+        for e in all_cell_location:
+            if x[e].solution_value > 0.9:
+                ac0.append(e[0])
+                ac1.append(e[1])
+
+        val = []
+        while ac1.__len__():
+            tmp_x = ac1.pop(0)
+            del ac0[0]
+            val.append(0)
+
+            while tmp_x and tmp_x in ac0:
+                i = ac0.index(tmp_x)
+                val[-1] += distance_dict[(ac0[i], ac1[i])]
+
+                tmp_x = ac1[i]
+                del ac0[i]
+                del ac1[i]
+        return val
