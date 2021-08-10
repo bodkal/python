@@ -148,8 +148,10 @@ class Utils:
             plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
             plt.gca().set_aspect('equal')
             plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
-
-        plt.show()
+        plt.draw()
+        plt.pause(0.001)
+        plt.clf()
+        #plt.show()
 
     @staticmethod
     def print_fov(grid_map,all_cell,main_cell):
@@ -176,18 +178,19 @@ class Utils:
 
         with open(map_config, newline='') as txtfile:
             #all_row = []
-            row_map=[ [1 if cell == '@' else 0 for cell in row[:-1]] for row in txtfile.readlines()]
+            row_map=[ [0 if cell == '.' else 1 for cell in row[:-1]] for row in txtfile.readlines()]
 
         return row_map
 
 class Node:
 
-    def __init__(self, parent, location, unseen, cost=0, heuristics=0):
+    def __init__(self, parent, location, unseen,dead_agent,cost=0, heuristics=0):
         self.parent = parent
         self.location = location
         self.unseen = unseen
         self.cost = cost
         self.heuristics = heuristics
+        self.dead_agent=dead_agent
 
     def __sort__(self):
         return tuple(sorted((self.location)))
@@ -296,211 +299,107 @@ import docplex.mp.solution as mp_sol
 
 class lp_mtsp():
 
-    def __init__(self,agent_manber):#,agent_locashon,distance_dict):
+    def __init__(self,agent_number,pivot,distance_dict):
         self.mdl = Model('SD-MTSP')
-        self.m = agent_manber
+        self.m = agent_number
+        self.mdl.set_time_limit(50)
+        self.mdl.parameters.threads = 1
+        self.mdl.parameters.mip.cuts.flowcovers = 1
+        self.mdl.parameters.mip.cuts.mircut = 1
+        self.mdl.parameters.mip.strategy.probe = 1
+        self.mdl.parameters.mip.strategy.variableselect = 4
+        self.mdl.parameters.mip.limits.cutpasses=-1
 
-        # self.mdl = Model('SD-MTSP')
-        #
-        # distance_out_agent={(0,i) : 0 for i in range(1,self.m+1)}
-        # distance_in_agent={(i,0) : 0 for i in range(1,self.m+1)}
-        #
-        # self.permanent_distance={**distance_out_agent,**distance_in_agent}
-        #
-        # self.x_permanent = self.mdl.binary_var_dict(self.permanent_distance, name='x')
-        # self.u_permanent = self.mdl.continuous_var_list(range(self.m+1),lb=0, name='u')
-        #
-        # for i in range(1,self.m+1):
-        #     self.mdl.add_constraint(self.x_permanent[(0, i)]  == 1, ctname=f'in_start_{i}')
+        #self.mdl.parameters.mip.strategy.presolvenode = 2
+        #self.mdl.parameters.mip.strategy.heuristicfreq: 100
+        #self.mdl.parameters.mip.strategy.backtrack: 0.1
 
+
+        # self.distance_out = {(0, i): 0 for i in range(1,self.m+1)}
+       # self.distance_in_agent = {(i, 0): 0 for i in range(1,self.m+1)}
+
+        self.k = self.mdl.continuous_var_dict(1, lb=0, name='k')
+
+        # self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
+        # self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
+
+        self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
+        self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
+
+        self.x = self.mdl.binary_var_dict(list(distance_dict.keys()), name='x')
+
+        self.mdl.minimize(self.k[0])
 
         #print(self.mdl.export_to_string())
 
 
+    def add_var(self,pivot,distance_dict):
 
+        for i in set(pivot.keys())-set(self.u_pivot.keys()):
+                self.u_pivot={**self.mdl.continuous_var_dict([i], lb=0, name='u_pivot'),**self.u_pivot}
 
-    def get_sum_of_cost(self):
-       # L = 70
+        for i in set(distance_dict.keys())-set(self.x.keys()):
+                self.x={**self.mdl.binary_var_dict([i], lb=0, name='x'),**self.x}
 
+    def get_makespan(self, for_plot, w, pivot, n, citys,distance_dict):
+        t=time()
+        self.mdl.clear_constraints()
 
-        ind = [0] * self.citys[1:].__len__()
+        self.add_var(pivot, distance_dict)
+        # print(len(distance_dict))
+        # distance_dict = {**self.distance_in_agent,**self.distance_out, **distance_dict}
+        # print(len(distance_dict))
 
-        #all_cell_location_no_start = [(i, j) for i in self.citys for j in self.citys if i != j and i != 0 and j != 0]
-        all_cell_location = [(i, j) for i in self.citys for j in self.citys if i != j]
+        all_directed_edges = list(distance_dict.keys())
 
-        mdl = Model('SD-MTSP')
+        all_u={**self.u_start_and_agent, **{key : self.u_pivot[key] for key in pivot.keys()}}
 
-        x = mdl.binary_var_dict(all_cell_location, name='x')
-        u = mdl.continuous_var_list(self.citys, name='u')
+        #max_subtoor
+        self.mdl.add_constraints_([self.k[0]>=self.u_pivot[c] for c in pivot.keys()])
 
-        mdl.minimize(mdl.sum(self.distance_dict[e] * x[e] for e in all_cell_location))
+        # 'out'
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if i == c) == 1
+                                                                                for c in list(all_u.keys())[1:]])
+        # in
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if j == c) == 1
+                                                                                for c in list(all_u.keys())[1:]])
 
-       # mdl.minimize(mdl.sum(u[i] * x[(i,0)] for i in self.citys[1:] if (i,0) in x))
+        self.mdl.add_constraint_(self.mdl.sum(self.x[(j, 0)] for j in all_u if j != 0) == self.m)
 
-        for c in self.citys[1:]:
-            mdl.add_constraint(mdl.sum(x[(i, j)] for i, j in all_cell_location if i == c) == 1, ctname='out_%d' % c)
-            mdl.add_constraint(mdl.sum(x[(i, j)] for i, j in all_cell_location if j == c) == 1, ctname='in_%d' % c)
+        a, b = zip(*[(self.x[c], all_u[c[1]] == all_u[c[0]] + distance_dict[c])
+                     for c in distance_dict.keys() if c[0] != 0 and c[1] != 0])
 
-        for c in self.agent_locashon:
-            mdl.add_constraint(x[(0, c)] == 1, ctname='out_dipot_%d' % c)
-
-        for c in self.agent_locashon:
-            mdl.add_constraint(x[(0, c)] == 1, ctname='out_dipot_%d' % c)
-
-        # mdl.add_constraint(mdl.sum(x[(0,j)] for j in range(n) if j != 0) == m, ctname='out_start')
-        mdl.add_constraint(mdl.sum(x[(j, 0)] for j in self.citys[1:] if j != 0) == self.m, ctname='in_start')
-
-        for i, j in all_cell_location:
-            if j != 0:
-                mdl.add_indicator(x[(i, j)], u[j] - u[i] >= self.distance_dict[(i, j)], name='order_(%d,_%d)' % (i, j))
-
-        # for i in self.citys[1:]:
-        #     ind[i - self.citys[1]] = mdl.add_indicator(x[(i, 0)], u[i] <= L, name=f'HB_2_{i}')
-
-        solucion = mdl.solve(log_output=False)
-
-        return solucion.objective_value/self.m
-
-    def get_makespan1(self,for_plot,w,p,n,tmp_distance):
-
-        #self.agent_locashon = agent_locashon
-        #self.citys = citys
-
-        tmp_mdl=self.mdl.clone()
-
-        per_var=[i for i in tmp_mdl.iter_variables()]
-
-            #.clone(new_name='tmp_model')
-
-        citys=range(self.m+self.u_permanent.__len__())
-        ind = [0] * citys[1:].__len__()
-        distance_dict={**self.permanent_distance,**tmp_distance}
-        all_cell_location = list(distance_dict.keys())
-
-        x_tmp = tmp_mdl.binary_var_dict(tmp_distance, name='x')
-        u_tmp = tmp_mdl.continuous_var_list(citys[self.m+1:], name='u')
-
-        x = {**x_tmp, **dict(zip(self.x_permanent.keys(), per_var[:self.x_permanent.__len__()])) }
-        u=per_var[self.x_permanent.__len__():]+u_tmp
-
-        tmp_mdl.minimize(tmp_mdl.sum(distance_dict[e] * x[e] for e in all_cell_location))
-
-        for c in citys[1:]:
-            tmp_mdl.add_constraint( tmp_mdl.sum(x[(i, j)] for i, j in all_cell_location if i == c) == 1, ctname='out_%d' % c)
-
-        for c in citys[self.m+1:]:
-            tmp_mdl.add_constraint(tmp_mdl.sum(x[(i, j)] for i, j in all_cell_location if j == c ) == 1, ctname='in_%d' % c)
-
-        tmp_mdl.add_constraint(tmp_mdl.sum(x[(j, 0)] for j in citys[1:] if j != 0) == self.m, ctname='in_start')
-
-        for i, j in all_cell_location:
-            if distance_dict[(i, j)]:
-                tmp_mdl.add_indicator(x[(i, j)], u[j] == u[i] + distance_dict[(i, j)], name='order_(%d,_%d)' % (i, j))
-
-        print(tmp_mdl.export_to_string())
-        solucion = tmp_mdl.solve(log_output=False)
-
-        max_u = self.get_subtoor(x, all_cell_location,distance_dict)
-        #self.print_SD_MTSP_on_map(for_plot, all_cell_location, x, w, p,citys)
-
-        while solucion:
-            L = int(max(max_u) - 1)
-            for i in citys[1:]:
-                ind[i - citys[1]] = tmp_mdl.add_indicator(x[(i, 0)], u[i] <= L, name=f'HB_2_{i}')
-            solucion = tmp_mdl.solve(log_output=False)
-
-            if solucion:
-                tmp_mdl.remove_constraints(ind)
-                max_u = self.get_subtoor(x, all_cell_location, distance_dict)
-                #self.print_SD_MTSP_on_map(for_plot, all_cell_location, x, w, p, citys)
-                xx=1
-
-        return max(max_u)
-
-    def get_makespan(self, for_plot, w, p, n, citys,distance_dict):
-
-        #lp_mtsp.get_makespan(for_plot, self.world, pivot, self.number_of_node, citys)
-
-        #self.agent_locashon = agent_locashon
-        #self.citys = citys
-        self.mdl.clear()
-        self.mdl.set_time_limit(1)
-        self.distance_dict = distance_dict
-
-        self.citys=citys
-        ind = [0] * self.citys[1:].__len__()
-        all_cell_location = list(self.distance_dict.keys())
-
-
-        x = self.mdl.binary_var_dict(all_cell_location, name='x')
-        u = self.mdl.continuous_var_list(self.citys, name='u')
-
-        self.mdl.minimize(self.mdl.sum(self.distance_dict[e] * x[e] for e in all_cell_location))
-
-        for c in self.citys[1:]:
-            self.mdl.add_constraint(self.mdl.sum(x[(i, j)] for i, j in all_cell_location if i == c) == 1, ctname='out_%d' % c)
-            self.mdl.add_constraint(self.mdl.sum(x[(i, j)] for i, j in all_cell_location if j == c) == 1, ctname='in_%d' % c)
-
-        self.mdl.add_constraint(self.mdl.sum(x[(0,j)] for j in self.citys[1:self.m+1]  if j != 0) == self.m, ctname='out_start')
-        self.mdl.add_constraint(self.mdl.sum(x[(j, 0)] for j in self.citys[1:] if j != 0) == self.m, ctname='in_start')
-
-        for i, j in all_cell_location:
-            if self.distance_dict[(i, j)]:
-                self.mdl.add_indicator(x[(i, j)], u[j] == u[i] + self.distance_dict[(i, j)], name='order_(%d,_%d)' % (i, j))
-               # mdl.add_indicator(x[(i, j)], u[j] >= u[i] + self.distance_dict[(i, j)], name='order_(%d,_%d)' % (i, j))
+        self.mdl.add_indicators(a,b,[1]*a.__len__())
+        #print(f'genarate cplax - {time() -t}')
+        #t=time()
 
         solucion = self.mdl.solve(log_output=False)
+        #print(f'solve - {time() -t}')
+
+        # cpx = self.mdl.get_engine().get_cplex()
+        # status = cpx.parameters.tune_problem()
+        # if status == cpx.parameters.tuning_status.completed:
+        #     print("tuned parameters:")
+        #     for param, value in cpx.parameters.get_changed():
+        #         print("{0}: {1}".format(repr(param), value))
+        # else:
+        #     print("tuning status was: {0}".format(cpx.parameters.tuning_status[status]))
+
+
         if self.mdl.solve_status.name != 'OPTIMAL_SOLUTION':
             print('-1')
             return -1
-        #print(solucion.solve_details)
-        #print(solucion.display())
 
-        #max_u = solucion.get_all_values()[-self.citys.__len__():]
-
-        #arcos_activos0,arcos_activos1 = [e for e in all_cell_location if x[e].solution_value > 0.9]
-        #return max(max_u)
-        #print(f' min_sum  {solucion.objective_value} HB : {L}  min_max : {max(max_u)}')
-
-        #self.print_SD_MTSP_on_map(for_plot, all_cell_location, x, w, p)
-        max_u = self.get_subtoor(x, all_cell_location,self.distance_dict)
-
-        #print(f'n : {n} HB : {val}  min_max : {max_u}')
-
-        #print(solucion.display())
-        #self.print_SD_MTSP_on_map(for_plot, all_cell_location, x, w, p)
-
-        while solucion:
-
-            L = int(max(max_u) - 1)
-            #mdl.change_var_upper_bounds(u,L)
-            for i in self.citys[1:]:
-                ind[i - self.citys[1]] = self.mdl.add_indicator(x[(i, 0)], u[i] <= L, name=f'HB_2_{i}')
-            solucion = self.mdl.solve(log_output=False)
+        max_u = solucion.get_objective_value()
 
 
-            if solucion:
-                self.mdl.remove_constraints(ind)
-                max_u = self.get_subtoor(x,all_cell_location,self.distance_dict)
-                if self.mdl.solve_status.name!='OPTIMAL_SOLUTION':
-                    print('-1')
-                    return -1
+        return round(max_u)
 
-                # solucion.get_all_values()[-self.citys.__len__():]
-                # print(f'n : {n} HB : {val}  min_max : {max_u}')
-                # print(f' min_sum  {solucion.objective_value} HB : {L}  min_max : {max(max_u)}')
-                # print(solucion.display())
-                # print(mdl.export_to_string())
-                # self.print_SD_MTSP_on_map(for_plot, all_cell_location, x, w, p)
-
-        #print(f'pivot = {p.__len__()}',end='\t')
-        return max(max_u)
-
-    def print_SD_MTSP_on_map(self,for_plot,all_cell_location,x,w,p):
+    def print_SD_MTSP_on_map(self,for_plot,all_cell_location,best_x,w,p):
 
         import matplotlib.pyplot as plt
         plt.figure('0')
-        arcos_activos = [e for e in all_cell_location if x[e].solution_value > 0.9]
+        arcos_activos = [e for e in all_cell_location if best_x[e].solution_value > 0.9]
         for i, j in arcos_activos:
             plt.plot([for_plot[i][1]+0.5, for_plot[j][1]+0.5], [for_plot[i][0]+0.5, for_plot[j][0]+0.5], color='r', alpha=0.6,linewidth=2, marker='o')
         # for i, j in for_plot:

@@ -28,18 +28,17 @@ class WorldMap:
         elif(los==5):
             self.action = self.get_static_action_5(1)
         elif(los==4):
-            self.action = self.get_static_action_4(1)
+            self.action = np.vstack((self.get_static_action_4(1),[0,0]))
 
 
     def get_action(self, state, move_index):
 
         action=[]
-
+        moving_status=[]
         for index,data in enumerate(state):
-
-            action.append((self.action[move_index[index]][0]+ data[0],self.action[move_index[index]][1]+ data[1]))
-
-        return tuple(action)
+                action.append((self.action[move_index[index]][0]+ data[0],self.action[move_index[index]][1]+ data[1]))
+                moving_status.append(np.sum(np.abs(self.action[move_index[index]])))
+        return tuple(action) , moving_status
 
     def is_disjoit(self,cell_a,cell_b):
         if self.dict_wachers[cell_a].intersection(self.dict_wachers[cell_b]):
@@ -212,13 +211,20 @@ class WorldMap:
         return tmp_set_seen
 
 
-    def is_valid_node(self, new_state, old_state):
+    def is_valid_node(self, new_state, old_state,moving_status):
+
         if not self.in_bund(new_state):
             return False
         elif not self.is_obstical(new_state):
             return False
         elif new_state == old_state.parent.location:
             return False
+        elif not np.any(moving_status):
+            return False
+
+        for i in old_state.dead_agent:
+            if moving_status[i]!=0:
+                return False
         return True
 
 

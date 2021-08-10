@@ -2,8 +2,13 @@ import numpy as np
 from random import randint
 from time import time
 import matplotlib.pyplot as plt
+from matplotlib import colors as c
 import csv
 
+colors = [(1, 1, 1), (0, 0, 0), (0.2, 0.2, 1), (1, 0, 0), (1, 1, 0), (0, 0.6, 0.05), (0.5, 0.5, 0.5)]
+
+
+# white    black       blue            red     yellow      green           grey
 
 class Utils:
 
@@ -46,7 +51,7 @@ class Utils:
     def centrality_dict(dist_dict, dist_map):
         centrality_dict = dict()
         for index, cell in enumerate(dist_dict):
-            #tmp_cell_all_dist = sum(cell)
+            # tmp_cell_all_dist = sum(cell)
             if cell:
                 centrality_dict[dist_map[index]] = cell
         return centrality_dict
@@ -98,7 +103,6 @@ class Utils:
                 centrality_list.insert(tmp_index, tuple((tmp_cell_all_dist, new_cell)))
         return centrality_list
 
-
     @staticmethod
     def centrality_meen_see(dist_wachers):
         centrality_list = []
@@ -108,15 +112,16 @@ class Utils:
         return centrality_list
 
     @staticmethod
-    def print_pivot(world,pivot):
+    def print_pivot(world, pivot):
         tmp = np.copy(world.grid_map)
         for cell in pivot.keys():
             tmp[cell] = 3
-        #plt.figure(1)
+        # plt.figure(1)
         plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
         plt.gca().set_aspect('equal')
         plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
-       # plt.show()
+
+    # plt.show()
 
     @staticmethod
     def print_whacer(world, tmp_cell):
@@ -126,7 +131,7 @@ class Utils:
                 tmp[cell] = 3
             tmp[pivot_cell] = 2
 
-           # plt.figure(pivot_cell.__str__())
+            # plt.figure(pivot_cell.__str__())
             plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
             plt.gca().set_aspect('equal')
             plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
@@ -136,64 +141,135 @@ class Utils:
     @staticmethod
     def print_all_whacers(world, tmp_cell):
         tmp = np.copy(world.grid_map)
-
+       # plt.rcParams["figure.figsize"] = (11, 7)
         for pivot_cell in tmp_cell:
             for cell_2 in pivot_cell:
                 for cell in world.dict_wachers[cell_2]:
-                    if not tmp[cell]==2:
+                    if not tmp[cell] == 2:
                         tmp[cell] = 3
                 tmp[cell_2] = 2
 
 
-            plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
-            plt.gca().set_aspect('equal')
-            plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
-        plt.draw()
-        plt.pause(0.001)
-        plt.clf()
-        #plt.show()
+        # white    black       blue            red     yellow      green           grey
 
-    @staticmethod
-    def print_fov(grid_map,all_cell,main_cell):
-        tmp = np.copy(grid_map)
+        cmap = c.ListedColormap([colors[i] for i in [0, 1, -2, -1]])
 
-        for cell in all_cell:
-            if not tmp[cell]==2:
-                tmp[cell] = 3
-            tmp[main_cell] = 2
-
-        plt.pcolormesh(tmp, edgecolors='grey', linewidth=0.01)
+        plt.pcolormesh(tmp, cmap=cmap, edgecolors='black', linewidth=0.01)
         plt.gca().set_aspect('equal')
         plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+
+        plt.show()
+
+    @staticmethod
+    def print_map(world):
+
+        # white    black       blue            red     yellow      green           grey
+
+        cmap = c.ListedColormap([colors[i] for i in [0, 1]])
+
+        plt.pcolormesh(world.grid_map, cmap=cmap, edgecolors='black', linewidth=0.01)
+        plt.gca().set_aspect('equal')
+        plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+
         plt.show()
 
 
     @staticmethod
+    def print_serch_status(world, node,start_time,expend,genrate,move,pivot=[]):
+        tmp = np.copy(world.grid_map)
+        plt.rcParams["figure.figsize"] = (11, 7)
+        seen=set(world.dict_wachers.keys())-node.unseen
+        for cell in seen:
+            tmp[cell] = 3
+
+        for cell in node.location:
+            tmp[cell] = 2
+
+        if pivot.__len__()>0:
+            cmap = c.ListedColormap([colors[i] for i in [0, 1, -2, -1, 4, 3]])
+
+            for cell in pivot:
+                for whacer in world.dict_wachers[cell]:
+                    tmp[whacer]=4
+            for cell in pivot:
+                tmp[cell] = 5
+        else:
+            cmap = c.ListedColormap([colors[i] for i in [0, 1, -2, -1]])
+
+        plt.pcolormesh(tmp, cmap=cmap, edgecolors='black', linewidth=0.01)
+        plt.gca().set_aspect('equal')
+        plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+            #self.col_max,
+
+        plt.text(-4.8,1, f'time - {round(time()-start_time,3)} sec' )
+        plt.text(-4.8,2, f'Expend - {expend}')
+        plt.text(-4.8,3, f'genarate - {genrate}')
+        plt.text(-4.8,4, f'g - {node.cost}')
+        plt.text(-4.8,5, f'h - {[node.f-i for i in node.cost]}')
+        plt.text(-4.8,6, f'f - {node.f}')
+        plt.text(-4.8,7, f'terminate - {node.dead_agent}')
+        plt.text(-4.8,8, f'coverge - {round(seen.__len__()/world.free_cell*100,3)} % ')
+        if move==True:
+            plt.draw()
+            plt.pause(0.001)
+            plt.clf()
+        else:
+            plt.show()
+
+    @staticmethod
+    def print_fov(grid_map, all_cell, main_cell):
+        tmp = np.copy(grid_map)
+
+        for cell in all_cell:
+            if not tmp[cell] == 2:
+                tmp[cell] = 3
+            tmp[main_cell] = 2
+
+        plt.pcolormesh(tmp, edgecolors='black', linewidth=0.01)
+        plt.gca().set_aspect('equal')
+        plt.gca().set_ylim(plt.gca().get_ylim()[::-1])
+        plt.show()
+
+    @staticmethod
     def map_to_sets(cell):
-        return set(map(tuple,[cell]))
+        return set(map(tuple, [cell]))
 
     @staticmethod
     def convert_map(map_config):
-        #row_map = []
+        # row_map = []
 
         with open(map_config, newline='') as txtfile:
-            #all_row = []
-            row_map=[ [0 if cell == '.' else 1 for cell in row[:-1]] for row in txtfile.readlines()]
+            # all_row = []
+            row_map = [[0 if cell == '.' else 1 for cell in row[:-1]] for row in txtfile.readlines()]
 
         return row_map
 
+    @staticmethod
+    def sort_list(list_a):
+        sorted_list_a = sorted(list_a)
+        sort_dick = {data: i for i, data in enumerate(sorted(range(len(list_a)), key=list_a.__getitem__))}
+        return tuple(sorted_list_a), sort_dick
+
+
 class Node:
 
-    def __init__(self, parent, location, unseen,dead_agent,cost=0, heuristics=0):
+    def __init__(self, parent, location, unseen, dead_agent, cost, f=0):
         self.parent = parent
         self.location = location
         self.unseen = unseen
         self.cost = cost
-        self.heuristics = heuristics
-        self.dead_agent=dead_agent
+        # if heuristics==0:
+        #     self.heuristics = [0]*self.location.__len__()
+        # else:
+        #    self.heuristics = heuristics
+
+        self.f = f
+
+        self.dead_agent = dead_agent
 
     def __sort__(self):
         return tuple(sorted((self.location)))
+
 
 class Bresenhams:
     def __init__(self, grid_map):
@@ -290,59 +366,62 @@ class FloydWarshall:
                 if key not in self.dict_dist:
                     self.dict_dist[key] = cost_map[ii][jj]
 
-        centrality_dict = {tuple(self.free_cell[index]) : sum(row) for index, row in enumerate(cost_map)}
+        centrality_dict = {tuple(self.free_cell[index]): sum(row) for index, row in enumerate(cost_map)}
         return self.dict_dist, centrality_dict
 
 
 from docplex.mp.model import Model
 import docplex.mp.solution as mp_sol
 
+
 class lp_mtsp():
 
-    def __init__(self,agent_number,pivot,distance_dict):
+    def __init__(self, agent_number, pivot, distance_dict):
         self.mdl = Model('SD-MTSP')
         self.m = agent_number
         self.mdl.set_time_limit(50)
-        self.mdl.parameters.threads = 1
+        self.mdl.parameters.threads = agent_number//2
+        #self.mdl.parameters.threads = 1
+
         self.mdl.parameters.mip.cuts.flowcovers = 1
         self.mdl.parameters.mip.cuts.mircut = 1
         self.mdl.parameters.mip.strategy.probe = 1
         self.mdl.parameters.mip.strategy.variableselect = 4
-        self.mdl.parameters.mip.limits.cutpasses=-1
+        self.mdl.parameters.mip.limits.cutpasses = -1
 
-        #self.mdl.parameters.mip.strategy.presolvenode = 2
-        #self.mdl.parameters.mip.strategy.heuristicfreq: 100
-        #self.mdl.parameters.mip.strategy.backtrack: 0.1
-
-
+        # self.mdl.parameters.mip.strategy.presolvenode = 2
+        # self.mdl.parameters.mip.strategy.heuristicfreq: 100
+        # self.mdl.parameters.mip.strategy.backtrack: 0.1
         # self.distance_out = {(0, i): 0 for i in range(1,self.m+1)}
-       # self.distance_in_agent = {(i, 0): 0 for i in range(1,self.m+1)}
+        # self.distance_in_agent = {(i, 0): 0 for i in range(1,self.m+1)}
 
         self.k = self.mdl.continuous_var_dict(1, lb=0, name='k')
 
         # self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
         # self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
 
-        self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
-        self.u_pivot=self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
+        self.u_start_and_agent = self.mdl.continuous_var_dict(range(self.m + 1), name='u_start_and_agent')
+        self.mdl.set_var_ub(self.u_start_and_agent[0], 0)
+        # self.u_start_and_agent=self.mdl.continuous_var_dict(range(self.m+1), lb=0,ub=0, name='u_start_and_agent')
+
+        self.u_pivot = self.mdl.continuous_var_dict(pivot.keys(), lb=0, name='u_pivot')
 
         self.x = self.mdl.binary_var_dict(list(distance_dict.keys()), name='x')
 
         self.mdl.minimize(self.k[0])
 
-        #print(self.mdl.export_to_string())
+        # print(self.mdl.export_to_string())
 
+    def add_var(self, pivot, distance_dict):
 
-    def add_var(self,pivot,distance_dict):
+        for i in set(pivot.keys()) - set(self.u_pivot.keys()):
+            self.u_pivot = {**self.mdl.continuous_var_dict([i], lb=0, name='u_pivot'), **self.u_pivot}
 
-        for i in set(pivot.keys())-set(self.u_pivot.keys()):
-                self.u_pivot={**self.mdl.continuous_var_dict([i], lb=0, name='u_pivot'),**self.u_pivot}
+        for i in set(distance_dict.keys()) - set(self.x.keys()):
+            self.x = {**self.mdl.binary_var_dict([i], lb=0, name='x'), **self.x}
 
-        for i in set(distance_dict.keys())-set(self.x.keys()):
-                self.x={**self.mdl.binary_var_dict([i], lb=0, name='x'),**self.x}
-
-    def get_makespan(self, for_plot, w, pivot, n, citys,distance_dict):
-        t=time()
+    def get_makespan(self, for_plot, w, pivot, n, citys, distance_dict, cost,aaa):
+        t = time()
         self.mdl.clear_constraints()
 
         self.add_var(pivot, distance_dict)
@@ -352,30 +431,35 @@ class lp_mtsp():
 
         all_directed_edges = list(distance_dict.keys())
 
-        all_u={**self.u_start_and_agent, **{key : self.u_pivot[key] for key in pivot.keys()}}
+        all_u = {**self.u_start_and_agent, **{key: self.u_pivot[key] for key in pivot.keys()}}
 
-        #max_subtoor
-        self.mdl.add_constraints_([self.k[0]>=self.u_pivot[c] for c in pivot.keys()])
+        for u in range(1, self.u_start_and_agent.__len__()):
+            self.mdl.set_var_lb(self.u_start_and_agent[u], cost[u - 1])
+            self.mdl.set_var_ub(self.u_start_and_agent[u], cost[u - 1])
+
+        # max_subtoor
+        self.mdl.add_constraints_([self.k[0] >= self.u_pivot[c] for c in pivot.keys()])
 
         # 'out'
-        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if i == c) == 1
-                                                                                for c in list(all_u.keys())[1:]])
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if i == c) == 1 for c in
+                                   list(all_u.keys())[1:]])
+
         # in
-        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if j == c) == 1
-                                                                                for c in list(all_u.keys())[1:]])
+        self.mdl.add_constraints_([self.mdl.sum(self.x[(i, j)] for i, j in all_directed_edges if j == c) == 1 for c in
+                                   list(all_u.keys())[1:]])
 
         self.mdl.add_constraint_(self.mdl.sum(self.x[(j, 0)] for j in all_u if j != 0) == self.m)
 
         a, b = zip(*[(self.x[c], all_u[c[1]] == all_u[c[0]] + distance_dict[c])
                      for c in distance_dict.keys() if c[0] != 0 and c[1] != 0])
 
-        self.mdl.add_indicators(a,b,[1]*a.__len__())
-        #print(f'genarate cplax - {time() -t}')
-        #t=time()
+        self.mdl.add_indicators(a, b, [1] * a.__len__())
+        # print(f'genarate cplax - {time() -t}')
+        # t=time()
 
         solucion = self.mdl.solve(log_output=False)
-        #print(f'solve - {time() -t}')
 
+        # print(f'solve - {time() -t}')
         # cpx = self.mdl.get_engine().get_cplex()
         # status = cpx.parameters.tune_problem()
         # if status == cpx.parameters.tuning_status.completed:
@@ -385,49 +469,51 @@ class lp_mtsp():
         # else:
         #     print("tuning status was: {0}".format(cpx.parameters.tuning_status[status]))
 
-
         if self.mdl.solve_status.name != 'OPTIMAL_SOLUTION':
             print('-1')
             return -1
 
+        # if aaa in [((1, 9), (5, 11), (7, 2), (7, 8), (10, 1)),
+        #                          ((2, 8), (4, 6), (6, 7), (9, 5), (9, 7)),
+        #                          ((2, 5), (2, 5), (6, 7), (9, 5), (9, 7)),
+        #                          ((1, 4), (1, 4), (6, 7), (9, 5), (9, 7)),
+        #                          ((1, 4), (2, 2), (6, 7), (9, 5), (9, 7))]:
+        #     print(solucion.get_objective_value())
+        #     self.print_SD_MTSP_on_map(for_plot, all_directed_edges, self.x, w, pivot)
+
         max_u = solucion.get_objective_value()
+        # if pivot.__len__() < 2:
+        #     solucion.display()
+        #     print(cost)
+        #     #self.print_SD_MTSP_on_map(for_plot, all_directed_edges, self.x, w, pivot)
+        #     x=1
+        return max([round(max_u)] + cost)
 
-
-        return round(max_u)
-
-    def print_SD_MTSP_on_map(self,for_plot,all_cell_location,best_x,w,p):
+    def print_SD_MTSP_on_map(self, for_plot, all_cell_location, best_x, w, p):
 
         import matplotlib.pyplot as plt
         plt.figure('0')
         arcos_activos = [e for e in all_cell_location if best_x[e].solution_value > 0.9]
         for i, j in arcos_activos:
-            plt.plot([for_plot[i][1]+0.5, for_plot[j][1]+0.5], [for_plot[i][0]+0.5, for_plot[j][0]+0.5], color='r', alpha=0.6,linewidth=2, marker='o')
+            if type(i) == int and type(j) == int:
+                plt.plot([for_plot[i][1] + 0.5, for_plot[j][1] + 0.5], [for_plot[i][0] + 0.5, for_plot[j][0] + 0.5],
+                         color='r', alpha=0.6, linewidth=2, marker='o')
+            elif type(i) == int:
+                plt.plot([for_plot[i][1] + 0.5, j[1] + 0.5], [for_plot[i][0] + 0.5, j[0] + 0.5], color='r', alpha=0.6,
+                         linewidth=2, marker='o')
+            elif type(j) == int:
+                plt.plot([i[1] + 0.5, for_plot[j][1] + 0.5], [i[0] + 0.5, for_plot[j][0] + 0.5], color='r', alpha=0.6,
+                         linewidth=2, marker='o')
+            else:
+                plt.plot([i[1] + 0.5, j[1] + 0.5], [i[0] + 0.5, j[0] + 0.5], color='r', alpha=0.6, linewidth=2,
+                         marker='o')
+
         # for i, j in for_plot:
         #     plt.scatter(j, i, color='r', zorder=1)
-        for i in self.citys:
-            plt.annotate(i, xy=(for_plot[i][1]+0.5, for_plot[i][0]+0.5),color ='k',weight='bold')
-        Utils.print_pivot(w,p)
+        # Utils.print_pivot(w,p)
+        # plt.show()
+        for i, j in for_plot:
+            plt.annotate(f'{i, j}', xy=(j + 1, i + 0.5), color='k', weight='bold')
+        Utils.print_pivot(w, p)
         plt.show()
 
-    def get_subtoor(self,x,all_cell_location,distance_dict):
-        ac0 = []
-        ac1 = []
-        for e in all_cell_location:
-            if x[e].solution_value > 0.9:
-                ac0.append(e[0])
-                ac1.append(e[1])
-
-        val = []
-        while ac1.__len__():
-            tmp_x = ac1.pop(0)
-            del ac0[0]
-            val.append(0)
-
-            while tmp_x and tmp_x in ac0:
-                i = ac0.index(tmp_x)
-                val[-1] += distance_dict[(ac0[i], ac1[i])]
-
-                tmp_x = ac1[i]
-                del ac0[i]
-                del ac1[i]
-        return val

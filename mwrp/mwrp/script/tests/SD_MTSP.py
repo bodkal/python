@@ -112,3 +112,24 @@ while solucion:
 plt.show()
 
 #print(f'solve in  {time()-t} sec len of : {max(max_u)}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,6 +3,7 @@ from itertools import product
 from time import time
 import sys
 from script.utils import Bresenhams ,Utils
+from script.BFS import BFS
 
 class WorldMap:
 
@@ -21,6 +22,7 @@ class WorldMap:
         self.create_wachers()
 
 
+
         if(los==9):
             self.action = self.get_static_action_9(1)
         elif(los==8):
@@ -29,6 +31,8 @@ class WorldMap:
             self.action = self.get_static_action_5(1)
         elif(los==4):
             self.action = np.vstack((self.get_static_action_4(1),[0,0]))
+
+        self.BFS = BFS(self)
 
 
     def get_action(self, state, move_index):
@@ -83,6 +87,32 @@ class WorldMap:
             tmp_index = np.where(np.abs(all_opsens[:, i * 2]) != np.abs(all_opsens[:, i * 2 + 1]))
             all_index = np.intersect1d(tmp_index, all_index)
         return np.copy(all_opsens[all_index]).astype(int)
+
+    def remove_obstical(self,number_of_obstical_to_remove):
+        import random
+        all_obstical = [i for i in np.transpose(np.where(np.array(self.grid_map) == 1))
+                                 if not np.any(i == 0) and i[0] != self.col_max - 1 and i[1] != self.row_max - 1]
+        print(self.grid_map)
+        while number_of_obstical_to_remove>0 and all_obstical.__len__()>0:
+            random_obstical=all_obstical.pop(random.randrange(len(all_obstical)))
+            actihon=self.get_static_action_4(1)+random_obstical
+            obs_number_row=0
+            obs_number_col=0
+
+            for index,cell in enumerate(actihon):
+                if self.grid_map[tuple(cell)]==1 and index in [0,3]:
+                    obs_number_row+=1
+                elif self.grid_map[tuple(cell)]==1 and index in [1,2]:
+                    obs_number_col+=1
+
+            if obs_number_row+obs_number_col<3 and (obs_number_row==0 or obs_number_col==0):
+                self.grid_map[tuple(random_obstical)]=0
+                print(random_obstical)
+                print(self.grid_map)
+
+                number_of_obstical_to_remove-=1
+        return self.grid_map
+
 
     # def los_4(self, state):
     #
